@@ -61,9 +61,16 @@
 
         // Multiple file paths to try
         const paths = [
-            'content://io.hextree.attacksurface/files/token.txt',
+            'content://io.hextree.root/files/token.txt',
+            'content://io.hextree.root/token.txt',
+            'content://io.hextree.root/files/token',
+                
+        
+            'content://io.hextree.root/internal/token.txt',
+            'content://io.hextree.root/data/token.txt',
+            'content://io.hextree.root/app/token.txt',
             'content://io.hextree.attacksurface.fileprovider/files/token.txt',
-            'content://io.hextree.root/files/token.txt,
+            'content://io.hextree.attacksurface/files/token.txt',
             'file:///data/data/io.hextree.attacksurface/files/token.txt',
             'file://data/data/io.hextree.attacksurface/files/token.txt',
             'file:///android_asset/token.txt',
